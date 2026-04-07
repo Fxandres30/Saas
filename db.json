@@ -1,0 +1,33 @@
+{
+  "usuarios": {
+    "cliente_1775093228465": {
+      "id": "cliente_1775093228465",
+      "trial": true,
+      "fecha_creacion": 1775093228488,
+      "mensajes": {
+        "disponible": "✅ TUS NÚMEROS HAN SIDO RESERVADOS",
+        "no_disponible": "❌ NO DISPONIBLES",
+        "combinado": "⚠️ ALGUNOS DISPONIBLES"
+      }
+    },
+    "cliente_1775093231727": {
+      "id": "cliente_1775093231727",
+      "trial": true,
+      "fecha_creacion": 1775093231729,
+      "mensajes": {
+        "disponible": "✅ TUS NÚMEROS HAN SIDO RESERVADOS",
+        "no_disponible": "❌ NO DISPONIBLES",
+        "combinado": "⚠️ ALGUNOS DISPONIBLES"
+      }
+    }
+  },
+  "grupos": {
+    "120363422425898785@g.us": {
+      "id": "120363422425898785@g.us",
+      "nombre": "#𝟐╺ 𝑬𝒇𝒂𝒂𝒕 𝑫𝒊𝒂𝒓𝒊𝒂𝒔 𝟓‐𝟏𝟓𝐊 💎",
+      "cliente_id": "cliente_1775071264211",
+      "permitido": false,
+      "expiracion": 1775676499681
+    }
+  }
+}

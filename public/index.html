@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bot SaaS</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>🔥 Bot de WhatsApp</h1>
+<button onclick="crear()">Crear cuenta</button>
+
+<script>
+async function crear() {
+  const res = await fetch("/crear")
+  const data = await res.json()
+
+  localStorage.setItem("cliente_id", data.cliente_id)
+
+  window.location.href = "/panel.html"
+}
+</script>
+
+</body>
+</html>

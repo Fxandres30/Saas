@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Panel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+
+<h1>📊 Panel</h1>
+
+<p id="id"></p>
+
+<div class="card">
+  <h3>📡 Estado</h3>
+  <p id="estado">Cargando...</p>
+
+  <h3>📲 QR</h3>
+  <img id="qr" width="200"/>
+</div>
+
+<h3>👥 Grupos</h3>
+<div id="grupos"></div>
+
+<h3>🧠 Logs</h3>
+<div id="logs" class="logs"></div>
+
+</div>
+
+<script>
+const cliente_id = localStorage.getItem("cliente_id")
+
+document.getElementById("id").innerText = cliente_id
+
+async function actualizar() {
+  const res = await fetch("/estado/" + cliente_id)
+  const data = await res.json()
+
+  document.getElementById("estado").innerText = data.estado
+
+  if (data.qr) {
+    document.getElementById("qr").src = data.qr
+  }
+
+  document.getElementById("logs").innerText = data.logs.join("\n")
+}
+
+async function cargarGrupos() {
+  const res = await fetch("/grupos/" + cliente_id)
+  const data = await res.json()
+
+  const contenedor = document.getElementById("grupos")
+  contenedor.innerHTML = ""
+
+  data.forEach(g => {
+    const div = document.createElement("div")
+    div.className = "card"
+
+    div.innerHTML = `
+      <h3>📌 ${g.nombre || "Sin nombre"}</h3>
+      <p>🆔 ${g.id}</p>
+      <p class="estado ${g.permitido ? 'activo' : 'bloqueado'}">
+        ${g.permitido ? '✅ Activo' : '🔒 Bloqueado'}
+      </p>
+      ${
+        !g.permitido
+          ? `<button onclick="activar('${g.id}')">💰 Activar</button>`
+          : ''
+      }
+    `
+
+    contenedor.appendChild(div)
+  })
+}
+
+async function activar(grupo_id) {
+  await fetch("/activar/" + grupo_id)
+  alert("Grupo activado")
+  cargarGrupos()
+}
+
+setInterval(() => {
+  actualizar()
+  cargarGrupos()
+}, 2000)
+</script>
+
+</body>
+</html>
