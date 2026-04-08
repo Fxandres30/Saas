@@ -1,25 +1,23 @@
 import express from "express"
-import makeWASocket, {
-  useMultiFileAuthState,
-  DisconnectReason,
-  fetchLatestBaileysVersion
-} from "@whiskeysockets/baileys"
-import QRCode from "qrcode"
-import P from "pino"
 import fs from "fs"
 
-import { crearUsuario, obtenerUsuario } from "./services/userService.js"
+import authRoutes from "./routes/authRoutes.js"
+import {
+  iniciarCliente,
+  estados,
+  qrs,
+  logs
+} from "./bot/iniciarBot.js"
 
 const app = express()
 const PORT = process.env.PORT || 3000
 
+// ================= MIDDLEWARES =================
+
 app.use(express.static("public"))
 app.use(express.json())
 
-const clientes = {}
-const qrs = {}
-const estados = {}
-const logs = {}
+// ================= DB =================
 
 const DB_PATH = "./db.json"
 
@@ -34,149 +32,44 @@ function saveDB(db) {
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2))
 }
 
-// ================= SOCKET =================
+// ================= AUTH =================
 
-async function iniciarCliente(cliente_id) {
-  const path = `./sessions/${cliente_id}`
+app.use("/auth", authRoutes)
 
-  if (!fs.existsSync(path)) {
-    fs.mkdirSync(path, { recursive: true })
+// ================= MENSAJES =================
+
+app.post("/guardar-mensajes", (req, res) => {
+  const { cliente_id, mensajes } = req.body
+
+  const db = loadDB()
+  const usuario = db.usuarios[cliente_id]
+
+  if (!usuario) {
+    return res.json({ error: "Usuario no existe" })
   }
 
-  const { state, saveCreds } = await useMultiFileAuthState(path)
-  const { version } = await fetchLatestBaileysVersion()
+  usuario.mensajes = mensajes
 
-  const sock = makeWASocket({
-    version,
-    auth: state,
-    logger: P({ level: "silent" })
-  })
+  db.usuarios[cliente_id] = usuario
+  saveDB(db)
 
-  clientes[cliente_id] = sock
-  estados[cliente_id] = "iniciando"
-  logs[cliente_id] = []
+  res.json({ ok: true })
+})
 
-  sock.ev.on("creds.update", saveCreds)
+// ================= BOT =================
 
-  // 🔥 CONEXIÓN
-  sock.ev.on("connection.update", async (update) => {
-    const { connection, qr, lastDisconnect } = update
+app.post("/iniciar", async (req, res) => {
+  const { cliente_id } = req.body
 
-    if (qr) {
-      qrs[cliente_id] = await QRCode.toDataURL(qr)
-      estados[cliente_id] = "esperando_qr"
-      logs[cliente_id].push("📲 QR generado")
-    }
-
-    if (connection === "open") {
-      estados[cliente_id] = "conectado"
-      qrs[cliente_id] = null
-      logs[cliente_id].push("✅ Conectado")
-    }
-
-    if (connection === "close") {
-      estados[cliente_id] = "desconectado"
-      logs[cliente_id].push("❌ Desconectado")
-
-      const code = lastDisconnect?.error?.output?.statusCode
-
-      if (code !== DisconnectReason.loggedOut) {
-        setTimeout(() => iniciarCliente(cliente_id), 5000)
-      } else {
-        delete clientes[cliente_id]
-      }
-    }
-  })
-
-  // ================= MENSAJES =================
-
-  sock.ev.on("messages.upsert", async ({ messages }) => {
-    const msg = messages[0]
-    if (!msg.message) return
-
-    const jid = msg.key.remoteJid
-
-    // ✅ SOLO GRUPOS
-    if (!jid || !jid.endsWith("@g.us")) return
-
-    logs[cliente_id].push(`📩 Grupo: ${jid}`)
-
-    const db = loadDB()
-    let grupo = db.grupos[jid]
-
-// 🔥 SIEMPRE obtener nombre actualizado
-let nombre = "Grupo"
-
-try {
-  const metadata = await sock.groupMetadata(jid)
-  nombre = metadata.subject
-} catch (err) {
-  logs[cliente_id].push("⚠️ Error obteniendo nombre")
-}
-
-// 🆕 CREAR SI NO EXISTE
-if (!grupo) {
-  grupo = {
-    id: jid,
-    nombre: nombre,
-    cliente_id,
-    permitido: false,
-    expiracion: Date.now() + 7 * 24 * 60 * 60 * 1000
+  if (!cliente_id) {
+    return res.status(400).json({ error: "cliente_id requerido" })
   }
-
-  db.grupos[jid] = grupo
-  saveDB(db)
-
-  logs[cliente_id].push("🆕 Grupo detectado")
-}
-
-// 🔥 ACTUALIZAR SI NO TIENE NOMBRE O CAMBIÓ
-if (!grupo.nombre || grupo.nombre !== nombre) {
-  grupo.nombre = nombre
-  saveDB(db)
-}
-
-    // 🔒 VALIDAR PERMISO
-    if (!grupo.permitido) {
-      logs[cliente_id].push("🔒 Grupo bloqueado")
-      return
-    }
-
-    // ⏰ VALIDAR EXPIRACIÓN
-    if (Date.now() > grupo.expiracion) return
-
-    const usuario = obtenerUsuario(cliente_id)
-    if (!usuario) return
-
-    const texto =
-      msg.message?.conversation ||
-      msg.message?.extendedTextMessage?.text
-
-    if (!texto) return
-
-    // 🔥 AQUÍ IRÁ TU LÓGICA (RESERVAS)
-    if (texto === "test") {
-      await sock.sendMessage(jid, {
-        text: usuario.mensajes.disponible
-      })
-    }
-  })
-}
-
-// ================= RUTAS =================
-
-// Crear cliente
-app.get("/crear", async (req, res) => {
-  const cliente_id = "cliente_" + Date.now()
-
-  crearUsuario(cliente_id)
 
   await iniciarCliente(cliente_id)
 
-  res.json({ cliente_id })
+  res.json({ ok: true })
 })
 
-// Estado
 app.get("/estado/:id", (req, res) => {
   res.json({
     estado: estados[req.params.id] || "cargando",
@@ -185,7 +78,8 @@ app.get("/estado/:id", (req, res) => {
   })
 })
 
-// Grupos
+// ================= GRUPOS =================
+
 app.get("/grupos/:cliente_id", (req, res) => {
   const db = loadDB()
 
@@ -200,10 +94,8 @@ app.get("/grupos/:cliente_id", (req, res) => {
   res.json(grupos)
 })
 
-// Activar grupo (simulación pago 💰)
 app.get("/activar/:grupo_id", (req, res) => {
   const db = loadDB()
-
   const grupo = db.grupos[req.params.grupo_id]
 
   if (!grupo) return res.send("No existe")
@@ -211,10 +103,91 @@ app.get("/activar/:grupo_id", (req, res) => {
   grupo.permitido = true
   grupo.expiracion = Date.now() + 30 * 24 * 60 * 60 * 1000
 
+  db.grupos[req.params.grupo_id] = grupo
   saveDB(db)
 
   res.send("✅ Grupo activado")
 })
+
+// ================= TABLA =================
+
+app.get("/tabla/:grupo_id", (req, res) => {
+  const db = loadDB()
+  const grupo = db.grupos[req.params.grupo_id]
+
+  if (!grupo) {
+    return res.json({ error: "Grupo no existe" })
+  }
+
+  const reservas = grupo.reservas || {}
+  const tabla = []
+
+  for (let i = 0; i <= 99; i++) {
+    const r = reservas[i]
+
+    tabla.push({
+      numero: i.toString().padStart(2, "0"),
+      estado: r ? r.estado : "disponible",
+      usuario: r ? r.usuario : null
+    })
+  }
+
+  res.json({
+    grupo: grupo.nombre,
+    tabla
+  })
+})
+
+// ================= ACCIONES =================
+
+app.post("/accion", (req, res) => {
+  const { grupo_id, numero, accion, usuario } = req.body
+
+  if (!grupo_id || numero === undefined || !accion) {
+    return res.json({ error: "Datos incompletos" })
+  }
+
+  const db = loadDB()
+  const grupo = db.grupos[grupo_id]
+
+  if (!grupo) {
+    return res.json({ error: "Grupo no existe" })
+  }
+
+  grupo.reservas = grupo.reservas || {}
+
+  const num = parseInt(numero)
+
+  if (isNaN(num) || num < 0 || num > 99) {
+    return res.json({ error: "Número inválido" })
+  }
+
+  if (accion === "reservar") {
+    grupo.reservas[num] = {
+      numero: num,
+      usuario: usuario || "manual",
+      estado: "reservado",
+      timestamp: Date.now()
+    }
+  }
+
+  if (accion === "pagar") {
+    if (grupo.reservas[num]) {
+      grupo.reservas[num].estado = "pagado"
+    }
+  }
+
+  if (accion === "liberar") {
+    delete grupo.reservas[num]
+  }
+
+  db.grupos[grupo_id] = grupo
+  saveDB(db)
+
+  res.json({ ok: true })
+})
+
+// ================= START =================
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Servidor corriendo en ${PORT}`)

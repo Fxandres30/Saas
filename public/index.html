@@ -7,17 +7,75 @@
 <body>
 
 <h1>🔥 Bot de WhatsApp</h1>
-<button onclick="crear()">Crear cuenta</button>
+
+<h2>Registro</h2>
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+<button onclick="register()">Registrarse</button>
+
+<h2>Login</h2>
+<input id="email_login" placeholder="Email">
+<input id="password_login" type="password" placeholder="Password">
+<button onclick="login()">Iniciar sesión</button>
 
 <script>
-async function crear() {
-  const res = await fetch("/crear")
+
+async function register() {
+  const email = document.getElementById("email").value
+  const password = document.getElementById("password").value
+
+  const res = await fetch("/auth/register", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ email, password })
+  })
+
   const data = await res.json()
 
-  localStorage.setItem("cliente_id", data.cliente_id)
+  if (data.error) {
+    alert(data.error)
+    return
+  }
 
+  alert("Usuario creado ✅")
+}
+
+async function login() {
+  const email = document.getElementById("email_login").value
+  const password = document.getElementById("password_login").value
+
+  const res = await fetch("/auth/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ email, password })
+  })
+
+  if (!res.ok) {
+    alert("Credenciales incorrectas ❌")
+    return
+  }
+
+  const user = await res.json()
+
+  localStorage.setItem("cliente_id", user.id)
+
+  // 🔥 iniciar bot automáticamente
+  await fetch("/iniciar", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ cliente_id: user.id })
+  })
+
+  // ir al panel
   window.location.href = "/panel.html"
 }
+
 </script>
 
 </body>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tabla</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+    }
+
+    h2 {
+      margin-top: 20px;
+    }
+
+    /* 🔥 FILTROS */
+    .filtros {
+      margin: 10px;
+    }
+
+    .filtros button {
+      margin: 5px;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    /* 🔥 GRID */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 8px;
+      max-width: 500px;
+      margin: 20px auto;
+    }
+
+    .item {
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .disponible { background: #22c55e; }
+    .reservado { background: #facc15; color: black; }
+    .pagado { background: #ef4444; }
+
+    /* 🔥 LISTA ABAJO */
+    .lista {
+      max-width: 500px;
+      margin: 20px auto;
+      text-align: left;
+      background: #1e293b;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .item-lista {
+      padding: 5px;
+      border-bottom: 1px solid #334155;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2 id="titulo">Cargando...</h2>
+
+<div class="filtros">
+  <button onclick="filtro='todos'; cargar()">Todos</button>
+  <button onclick="filtro='disponible'; cargar()">Disponibles</button>
+  <button onclick="filtro='reservado'; cargar()">Reservados</button>
+  <button onclick="filtro='pagado'; cargar()">Pagados</button>
+</div>
+
+<div class="grid" id="tabla"></div>
+
+<h3>📋 Detalle</h3>
+<div class="lista" id="lista"></div>
+
+<script>
+const params = new URLSearchParams(window.location.search)
+const grupo = params.get("g")
+
+let filtro = "todos"
+
+async function cargar() {
+  const res = await fetch(`/tabla/${grupo}`)
+  const data = await res.json()
+
+  document.getElementById("titulo").innerText = data.grupo
+
+  const cont = document.getElementById("tabla")
+  const lista = document.getElementById("lista")
+
+  cont.innerHTML = ""
+  lista.innerHTML = ""
+
+  data.tabla.forEach(n => {
+
+    // 🔥 FILTRO
+    if (filtro !== "todos" && n.estado !== filtro) return
+
+    // 🔲 CUADRO
+    const div = document.createElement("div")
+    div.className = `item ${n.estado}`
+    div.innerText = n.numero
+
+    div.onclick = async () => {
+
+      let accion = ""
+      let usuario = null
+
+      if (n.estado === "disponible") {
+        const nombre = prompt("Nombre del usuario")
+        if (!nombre) return
+
+        accion = "reservar"
+        usuario = nombre
+      }
+
+      else if (n.estado === "reservado") {
+        if (!confirm(`¿Marcar ${n.numero} como pagado?`)) return
+        accion = "pagar"
+      }
+
+      else if (n.estado === "pagado") {
+        if (!confirm(`¿Liberar ${n.numero}?`)) return
+        accion = "liberar"
+      }
+
+      await fetch("/accion", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          grupo_id: grupo,
+          numero: parseInt(n.numero),
+          accion,
+          usuario
+        })
+      })
+
+      cargar()
+    }
+
+    cont.appendChild(div)
+
+    // 🔥 LISTA ABAJO (solo si tiene usuario)
+    if (n.usuario) {
+      const item = document.createElement("div")
+      item.className = "item-lista"
+      item.innerText = `${n.numero} → ${n.usuario} (${n.estado})`
+      lista.appendChild(item)
+    }
+
+  })
+}
+
+cargar()
+setInterval(cargar, 2000)
+</script>
+
+</body>
+</html>
