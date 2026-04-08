@@ -19,6 +19,16 @@
         "no_disponible": "❌ NO DISPONIBLES",
         "combinado": "⚠️ ALGUNOS DISPONIBLES"
       }
+    },
+    "cliente_1775593163280": {
+      "id": "cliente_1775593163280",
+      "trial": true,
+      "fecha_creacion": 1775593163281,
+      "mensajes": {
+        "disponible": "✅ TUS NÚMEROS HAN SIDO RESERVADOS",
+        "no_disponible": "❌ NO DISPONIBLES",
+        "combinado": "⚠️ ALGUNOS DISPONIBLES"
+      }
     }
   },
   "grupos": {
