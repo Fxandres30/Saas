@@ -124,11 +124,6 @@ export async function manejarMensaje({ msg, sock, cliente_id, loadDB, saveDB }) 
       text: msgReservado.replace("{numero}", numero)
     })
 
-    // 🔥 LINK TABLA
-    await sock.sendMessage(jid, {
-      text: `📊 Ver tabla actualizada:\nhttp://209.38.77.179:3000/tabla.html?g=${jid}`
-    })
-
     return
   }
 }

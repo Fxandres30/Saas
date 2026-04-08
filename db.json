@@ -5,7 +5,7 @@
       "email": "juanperez@gmail.com",
       "password": "123456",
       "mensajes": {
-        "reservado": "Listo numeros reservados. EFAAT",
+        "reservado": "",
         "ocupado": "",
         "invalido": ""
       }
@@ -144,11 +144,29 @@
           "estado": "reservado",
           "timestamp": 1775668961966
         },
+        "72": {
+          "numero": 72,
+          "usuario": "45123631075482@lid",
+          "estado": "reservado",
+          "timestamp": 1775673306749
+        },
+        "77": {
+          "numero": 77,
+          "usuario": "45123631075482@lid",
+          "estado": "reservado",
+          "timestamp": 1775673273466
+        },
         "80": {
           "numero": 80,
           "usuario": "45123631075482@lid",
           "estado": "reservado",
           "timestamp": 1775668951871
+        },
+        "86": {
+          "numero": 86,
+          "usuario": "45123631075482@lid",
+          "estado": "reservado",
+          "timestamp": 1775672861346
         },
         "89": {
           "numero": 89,
@@ -161,6 +179,18 @@
           "usuario": "45123631075482@lid",
           "estado": "reservado",
           "timestamp": 1775668218936
+        },
+        "93": {
+          "numero": 93,
+          "usuario": "45123631075482@lid",
+          "estado": "reservado",
+          "timestamp": 1775673298244
+        },
+        "99": {
+          "numero": 99,
+          "usuario": "45123631075482@lid",
+          "estado": "reservado",
+          "timestamp": 1775673291388
         }
       }
     }
