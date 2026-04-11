@@ -25,81 +25,105 @@ app.use("/auth", authRoutes)
 // ================= USUARIO =================
 
 app.get("/usuario/:id", async (req, res) => {
-  const { data, error } = await supabase
-    .from("usuarios")
-    .select("*")
-    .eq("id", req.params.id)
-    .single()
+  try {
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("*")
+      .eq("id", req.params.id)
+      .single()
 
-  if (error || !data) {
-    return res.status(404).json({ error: "Usuario no existe" })
+    if (error || !data) {
+      return res.status(404).json({ error: "Usuario no existe" })
+    }
+
+    res.json(data)
+
+  } catch (err) {
+    res.status(500).json({ error: "Error servidor" })
   }
-
-  res.json(data)
 })
 
 // ================= MENSAJES =================
 
-// 🔥 GUARDAR (MULTI MENSAJES BIEN)
 app.post("/guardar-mensajes", async (req, res) => {
-  const { cliente_id, mensajes } = req.body
+  try {
+    const { cliente_id, mensajes } = req.body
 
-  await supabase
-    .from("mensajes")
-    .delete()
-    .eq("cliente_id", cliente_id)
+    if (!cliente_id) {
+      return res.json({ error: "cliente_id requerido" })
+    }
 
-  let inserts = []
+    await supabase
+      .from("mensajes")
+      .delete()
+      .eq("cliente_id", cliente_id)
 
-  Object.entries(mensajes).forEach(([tipo, lista]) => {
-    if (!Array.isArray(lista)) return
+    let inserts = []
 
-    lista.forEach(texto => {
-      inserts.push({
-        cliente_id,
-        tipo,
-        contenido: texto,
-        activo: true
+    Object.entries(mensajes || {}).forEach(([tipo, lista]) => {
+      if (!Array.isArray(lista)) return
+
+      lista.forEach(texto => {
+        inserts.push({
+          cliente_id,
+          tipo,
+          contenido: texto,
+          activo: true
+        })
       })
     })
-  })
 
-  const { error } = await supabase
-    .from("mensajes")
-    .insert(inserts)
+    if (inserts.length > 0) {
+      const { error } = await supabase
+        .from("mensajes")
+        .insert(inserts)
 
-  if (error) return res.json({ error: error.message })
+      if (error) return res.json({ error: error.message })
+    }
 
-  res.json({ ok: true })
+    res.json({ ok: true })
+
+  } catch (err) {
+    res.status(500).json({ error: "Error servidor" })
+  }
 })
 
-// 🔥 OBTENER MENSAJES (ÚNICO Y CORRECTO)
 app.get("/mensajes/:cliente_id", async (req, res) => {
-  const { data, error } = await supabase
-    .from("mensajes")
-    .select("*")
-    .eq("cliente_id", req.params.cliente_id)
-    .eq("activo", true)
+  try {
+    const { data, error } = await supabase
+      .from("mensajes")
+      .select("*")
+      .eq("cliente_id", req.params.cliente_id)
+      .eq("activo", true)
 
-  if (error) {
-    return res.status(500).json({ error: error.message })
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json(data || [])
+
+  } catch (err) {
+    res.status(500).json({ error: "Error servidor" })
   }
-
-  res.json(data || [])
 })
 
 // ================= BOT =================
 
 app.post("/iniciar", async (req, res) => {
-  const { cliente_id } = req.body
+  try {
+    const { cliente_id } = req.body
 
-  if (!cliente_id) {
-    return res.status(400).json({ error: "cliente_id requerido" })
+    if (!cliente_id) {
+      return res.status(400).json({ error: "cliente_id requerido" })
+    }
+
+    await iniciarCliente(cliente_id)
+
+    res.json({ ok: true })
+
+  } catch (err) {
+    res.status(500).json({ error: "Error iniciando bot" })
   }
-
-  await iniciarCliente(cliente_id)
-
-  res.json({ ok: true })
 })
 
 app.get("/estado/:id", (req, res) => {
@@ -113,126 +137,145 @@ app.get("/estado/:id", (req, res) => {
 // ================= GRUPOS =================
 
 app.get("/grupos/:cliente_id", async (req, res) => {
-  const { data, error } = await supabase
-    .from("grupos")
-    .select("id, nombre, permitido")
-    .eq("cliente_id", req.params.cliente_id)
+  try {
+    const { data, error } = await supabase
+      .from("grupos")
+      .select("id, nombre, permitido")
+      .eq("cliente_id", req.params.cliente_id)
 
-  if (error) return res.json({ error: error.message })
+    if (error) return res.json({ error: error.message })
 
-  res.json(data)
+    res.json(data)
+
+  } catch (err) {
+    res.status(500).json({ error: "Error servidor" })
+  }
 })
 
 app.get("/activar/:grupo_id", async (req, res) => {
-  const { error } = await supabase
-    .from("grupos")
-    .update({
-      permitido: true,
-      expiracion: Date.now() + 30 * 24 * 60 * 60 * 1000
-    })
-    .eq("id", req.params.grupo_id)
+  try {
+    const { error } = await supabase
+      .from("grupos")
+      .update({
+        permitido: true,
+        expiracion: Date.now() + 30 * 24 * 60 * 60 * 1000
+      })
+      .eq("id", req.params.grupo_id)
 
-  if (error) return res.send("Error")
+    if (error) return res.send("Error")
 
-  res.send("✅ Grupo activado")
+    res.send("✅ Grupo activado")
+
+  } catch (err) {
+    res.status(500).send("Error servidor")
+  }
 })
 
 // ================= TABLA =================
 
 app.get("/tabla/:grupo_id", async (req, res) => {
-  const { data: grupo } = await supabase
-    .from("grupos")
-    .select("*")
-    .eq("id", req.params.grupo_id)
-    .single()
+  try {
+    const { data: grupo } = await supabase
+      .from("grupos")
+      .select("*")
+      .eq("id", req.params.grupo_id)
+      .single()
 
-  if (!grupo) {
-    return res.json({ error: "Grupo no existe" })
-  }
+    if (!grupo) {
+      return res.json({ error: "Grupo no existe" })
+    }
 
-  const { data: reservas } = await supabase
-    .from("reservas")
-    .select("*")
-    .eq("grupo_id", req.params.grupo_id)
+    const { data: reservas } = await supabase
+      .from("reservas")
+      .select("*")
+      .eq("grupo_id", req.params.grupo_id)
 
-  const mapa = {}
+    const mapa = {}
 
-  reservas?.forEach(r => {
-    mapa[r.numero] = r
-  })
-
-  const tabla = []
-
-  for (let i = 0; i <= 99; i++) {
-    const r = mapa[i]
-
-    tabla.push({
-      numero: i.toString().padStart(2, "0"),
-      estado: r ? r.estado : "disponible",
-      usuario: r ? r.usuario : null
+    reservas?.forEach(r => {
+      mapa[r.numero] = r
     })
-  }
 
-  res.json({
-    grupo: grupo.nombre,
-    tabla
-  })
+    const tabla = []
+
+    for (let i = 0; i <= 99; i++) {
+      const r = mapa[i]
+
+      tabla.push({
+        numero: i.toString().padStart(2, "0"),
+        estado: r ? r.estado : "disponible",
+        usuario: r ? r.usuario : null
+      })
+    }
+
+    res.json({
+      grupo: grupo.nombre,
+      tabla
+    })
+
+  } catch (err) {
+    res.status(500).json({ error: "Error servidor" })
+  }
 })
 
 // ================= ACCIONES =================
 
 app.post("/accion", async (req, res) => {
-  const { grupo_id, numero, accion, usuario } = req.body
+  try {
+    const { grupo_id, numero, accion, usuario } = req.body
 
-  if (!grupo_id || numero === undefined || !accion) {
-    return res.json({ error: "Datos incompletos" })
-  }
-
-  const num = parseInt(numero)
-
-  if (isNaN(num) || num < 0 || num > 99) {
-    return res.json({ error: "Número inválido" })
-  }
-
-  // 🔥 mejor manejo
-  const { data: existente } = await supabase
-    .from("reservas")
-    .select("*")
-    .eq("grupo_id", grupo_id)
-    .eq("numero", num)
-    .maybeSingle()
-
-  if (accion === "reservar") {
-    if (existente) {
-      return res.json({ error: "Número ocupado" })
+    if (!grupo_id || numero === undefined || !accion) {
+      return res.json({ error: "Datos incompletos" })
     }
 
-    await supabase.from("reservas").insert({
-      grupo_id,
-      numero: num,
-      usuario: usuario || "manual",
-      estado: "reservado",
-      timestamp: Date.now()
-    })
-  }
+    const num = parseInt(numero)
 
-  if (accion === "pagar") {
-    await supabase
+    if (isNaN(num) || num < 0 || num > 99) {
+      return res.json({ error: "Número inválido" })
+    }
+
+    const { data: existente } = await supabase
       .from("reservas")
-      .update({ estado: "pagado" })
+      .select("*")
       .eq("grupo_id", grupo_id)
       .eq("numero", num)
-  }
+      .maybeSingle()
 
-  if (accion === "liberar") {
-    await supabase
-      .from("reservas")
-      .delete()
-      .eq("grupo_id", grupo_id)
-      .eq("numero", num)
-  }
+    if (accion === "reservar") {
+      if (existente) {
+        return res.json({ error: "Número ocupado" })
+      }
 
-  res.json({ ok: true })
+      await supabase.from("reservas").insert({
+        grupo_id,
+        numero: num,
+        usuario: usuario || "manual",
+        estado: "reservado",
+        timestamp: Date.now()
+      })
+    }
+
+    if (accion === "pagar") {
+      await supabase
+        .from("reservas")
+        .update({ estado: "pagado" })
+        .eq("grupo_id", grupo_id)
+        .eq("numero", num)
+    }
+
+    if (accion === "liberar") {
+      await supabase
+        .from("reservas")
+        .delete()
+        .eq("grupo_id", grupo_id)
+        .eq("numero", num)
+    }
+
+    res.json({ ok: true })
+
+  } catch (err) {
+    res.status(500).json({ error: "Error servidor" })
+  }
 })
 
 // ================= START =================
