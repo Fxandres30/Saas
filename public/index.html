@@ -2,23 +2,73 @@
 <html>
 <head>
   <title>Bot SaaS</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="./css/login.css">
 </head>
-<body>
+<body class="auth-body">
 
-<h1>🔥 Bot de WhatsApp</h1>
+<div class="auth-wrapper">
 
-<h2>Registro</h2>
-<input id="email" placeholder="Email">
-<input id="password" type="password" placeholder="Password">
-<button onclick="register()">Registrarse</button>
+  <div class="auth-card">
 
-<h2>Login</h2>
-<input id="email_login" placeholder="Email">
-<input id="password_login" type="password" placeholder="Password">
-<button onclick="login()">Iniciar sesión</button>
+    <h2 id="titulo">Iniciar sesión</h2>
+
+    <!-- LOGIN -->
+    <div id="loginBox">
+      <input id="email_login" placeholder="Email">
+      <input id="password_login" type="password" placeholder="Password">
+
+      <button onclick="login()">Entrar</button>
+
+      <div class="divider">o continuar con</div>
+
+      <button class="google-btn">
+  <img src="https://www.svgrepo.com/show/475656/google-color.svg" width="18">
+  Continuar con Google
+</button>
+
+      <p class="switch">
+        ¿No tienes cuenta? 
+        <span onclick="mostrarRegistro()">Regístrate</span>
+      </p>
+    </div>
+
+    <!-- REGISTRO -->
+    <div id="registerBox" class="hidden">
+      <input id="email" placeholder="Email">
+      <input id="password" type="password" placeholder="Password">
+
+      <button onclick="register()">Crear cuenta</button>
+
+      <div class="divider">o continuar con</div>
+
+      <button class="google-btn">
+  <img src="https://www.svgrepo.com/show/475656/google-color.svg" width="18">
+  Continuar con Google
+</button>
+
+      <p class="switch">
+        ¿Ya tienes cuenta? 
+        <span onclick="mostrarLogin()">Inicia sesión</span>
+      </p>
+    </div>
+
+  </div>
+
+</div>
 
 <script>
+
+function mostrarRegistro() {
+  document.getElementById("loginBox").classList.add("hidden")
+  document.getElementById("registerBox").classList.remove("hidden")
+  document.getElementById("titulo").innerText = "Registro"
+}
+
+function mostrarLogin() {
+  document.getElementById("registerBox").classList.add("hidden")
+  document.getElementById("loginBox").classList.remove("hidden")
+  document.getElementById("titulo").innerText = "Iniciar sesión"
+}
 
 async function register() {
   const email = document.getElementById("email").value
@@ -26,20 +76,19 @@ async function register() {
 
   const res = await fetch("/auth/register", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password })
   })
 
   const data = await res.json()
 
-  if (data.error) {
-    alert(data.error)
+  if (!res.ok) {
+    alert(data.error || "Error")
     return
   }
 
   alert("Usuario creado ✅")
+  mostrarLogin()
 }
 
 async function login() {
@@ -48,31 +97,25 @@ async function login() {
 
   const res = await fetch("/auth/login", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password })
   })
 
+  const data = await res.json()
+
   if (!res.ok) {
-    alert("Credenciales incorrectas ❌")
+    alert(data.error || "Credenciales incorrectas ❌")
     return
   }
 
-  const user = await res.json()
+  localStorage.setItem("cliente_id", data.id)
 
-  localStorage.setItem("cliente_id", user.id)
-
-  // 🔥 iniciar bot automáticamente
   await fetch("/iniciar", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ cliente_id: user.id })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cliente_id: data.id })
   })
 
-  // ir al panel
   window.location.href = "/panel.html"
 }
 

@@ -7,33 +7,69 @@ import QRCode from "qrcode"
 import P from "pino"
 import fs from "fs"
 
-import { obtenerUsuario } from "../services/userService.js"
-import { manejarMensaje } from "./mensajes.js"
+import { manejarMensaje } from "./manejarMensaje.js"
 
-// ================= VARIABLES COMPARTIDAS =================
+// ================= VARIABLES =================
 
 export const clientes = {}
 export const qrs = {}
 export const estados = {}
 export const logs = {}
 
-const DB_PATH = "./db.json"
+const reintentos = {}
+const reseteando = {}
+const conectando = {} // 🔥 clave
 
-function loadDB() {
-  if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ usuarios: {}, grupos: {} }))
+// ================= RESET =================
+
+function resetCliente(cliente_id) {
+  if (reseteando[cliente_id]) return
+  reseteando[cliente_id] = true
+
+  try {
+    const path = `./sessions/${cliente_id}`
+
+    console.log("🔥 Reseteando sesión:", cliente_id)
+
+    if (clientes[cliente_id]) {
+      try { clientes[cliente_id].end?.() } catch {}
+    }
+
+    if (fs.existsSync(path)) {
+      fs.rmSync(path, { recursive: true, force: true })
+    }
+
+    delete clientes[cliente_id]
+    estados[cliente_id] = "reiniciando"
+    qrs[cliente_id] = null
+    reintentos[cliente_id] = 0
+
+    setTimeout(() => {
+      reseteando[cliente_id] = false
+      iniciarCliente(cliente_id)
+    }, 3000)
+
+  } catch (err) {
+    console.error("❌ Error reset:", err)
+    reseteando[cliente_id] = false
   }
-  return JSON.parse(fs.readFileSync(DB_PATH))
-}
-
-function saveDB(db) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2))
 }
 
 // ================= BOT =================
 
 export async function iniciarCliente(cliente_id) {
   try {
+
+    // 🔥 evitar múltiples conexiones
+    if (conectando[cliente_id]) return
+    conectando[cliente_id] = true
+
+    if (clientes[cliente_id]) {
+      console.log("⚠️ Ya existe cliente:", cliente_id)
+      conectando[cliente_id] = false
+      return
+    }
+
     const path = `./sessions/${cliente_id}`
 
     if (!fs.existsSync(path)) {
@@ -51,7 +87,6 @@ export async function iniciarCliente(cliente_id) {
 
     clientes[cliente_id] = sock
     estados[cliente_id] = "iniciando"
-    logs[cliente_id] = []
 
     sock.ev.on("creds.update", saveCreds)
 
@@ -61,49 +96,74 @@ export async function iniciarCliente(cliente_id) {
       if (qr) {
         qrs[cliente_id] = await QRCode.toDataURL(qr)
         estados[cliente_id] = "esperando_qr"
+        console.log("📲 QR generado:", cliente_id)
       }
 
       if (connection === "open") {
         estados[cliente_id] = "conectado"
         qrs[cliente_id] = null
+        reintentos[cliente_id] = 0
+        conectando[cliente_id] = false
+
+        console.log("✅ Conectado:", cliente_id)
       }
 
       if (connection === "close") {
-        estados[cliente_id] = "desconectado"
-
         const code = lastDisconnect?.error?.output?.statusCode
 
-        if (code !== DisconnectReason.loggedOut) {
-          setTimeout(() => iniciarCliente(cliente_id), 5000)
-        } else {
-          delete clientes[cliente_id]
+        console.log("❌ Desconectado:", cliente_id, "Code:", code)
+
+        estados[cliente_id] = "desconectado"
+
+        // 🔥 NO reiniciar si hay QR (usuario debe escanear)
+        if (qrs[cliente_id]) {
+          console.log("⏳ Esperando QR, no reiniciar")
+          conectando[cliente_id] = false
+          return
         }
+
+        // 🔥 logout real
+        if (
+          code === DisconnectReason.loggedOut ||
+          code === 401 ||
+          code === 403
+        ) {
+          console.log("🚨 Sesión inválida → reset")
+          conectando[cliente_id] = false
+          resetCliente(cliente_id)
+          return
+        }
+
+        reintentos[cliente_id] = (reintentos[cliente_id] || 0) + 1
+
+        if (reintentos[cliente_id] > 5) {
+          console.log("🛑 Demasiados intentos → reset")
+          conectando[cliente_id] = false
+          resetCliente(cliente_id)
+          return
+        }
+
+        console.log("🔄 Reintentando...", reintentos[cliente_id])
+
+        delete clientes[cliente_id]
+
+        setTimeout(() => {
+          conectando[cliente_id] = false
+          iniciarCliente(cliente_id)
+        }, 5000)
       }
     })
 
-    sock.ev.on("groups.update", async (updates) => {
-  const db = loadDB()
-
-  for (const update of updates) {
-    const grupo = db.grupos[update.id]
-
-    if (grupo && update.subject) {
-      grupo.nombre = update.subject
-      db.grupos[update.id] = grupo
-      saveDB(db)
-
-      logs[cliente_id].push("🔄 Nombre actualizado: " + update.subject)
-    }
-  }
-})
-
-    // 🔥 AQUÍ LLAMAMOS LA LÓGICA EXTERNA
     sock.ev.on("messages.upsert", async ({ messages }) => {
       try {
         const msg = messages[0]
         if (!msg || !msg.message || msg.key.fromMe) return
 
-        await manejarMensaje({ msg, sock, cliente_id, loadDB, saveDB })
+        await manejarMensaje({
+          msg,
+          sock,
+          cliente_id
+        })
 
       } catch (err) {
         console.error("❌ ERROR BOT:", err)
@@ -112,5 +172,6 @@ export async function iniciarCliente(cliente_id) {
 
   } catch (error) {
     console.error("❌ Error iniciarCliente:", error)
+    conectando[cliente_id] = false
   }
 }

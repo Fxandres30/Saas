@@ -2,41 +2,111 @@
 <html>
 <head>
   <title>Panel</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="./css/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
+
 <body>
 
-<div class="container">
-  <button onclick="logout()" style="float:right;">🚪 Cerrar sesión</button>
+<div class="layout">
 
-  <h1>📊 Panel</h1>
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <h2 class="logo">
+      <i data-lucide="bot"></i>
+      <span>Bot SaaS</span>
+    </h2>
 
-  <p id="id"></p>
+    <button onclick="mostrar('dashboard')">
+      <i data-lucide="layout-dashboard"></i> Dashboard
+    </button>
 
-  <div class="card">
-    <h3>📡 Estado</h3>
-    <p id="estado">Cargando...</p>
+    <button onclick="mostrar('grupos_seccion')">
+      <i data-lucide="users"></i> Grupos
+    </button>
 
-    <h3>📲 QR</h3>
-    <img id="qr" width="200"/>
+    <button onclick="mostrar('mensajes')">
+      <i data-lucide="settings"></i> Mensajes
+    </button>
+
+    <button onclick="mostrar('logs')">
+      <i data-lucide="file-text"></i> Logs
+    </button>
+
+    <hr>
+
+    <button onclick="logout()">
+      <i data-lucide="log-out"></i> Salir
+    </button>
   </div>
 
-  <h3>👥 Grupos</h3>
-  <div id="grupos"></div>
+  <!-- MAIN -->
+  <div class="main">
 
-  <h3>⚙️ Mensajes</h3>
+    <div class="topbar">
+      <h2><i data-lucide="panel-top"></i> Panel</h2>
+      <span id="estado_top"></span>
+    </div>
 
-  <div class="card">
-    <input id="msg_reservado" placeholder="Mensaje reservado" />
-    <input id="msg_ocupado" placeholder="Mensaje ocupado" />
-    <input id="msg_invalido" placeholder="Mensaje inválido" />
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="seccion">
+      <div class="grid">
 
-    <button onclick="guardarMensajes()">💾 Guardar</button>
+        <div class="card">
+          <h3><i data-lucide="activity"></i> Estado</h3>
+          <p id="estado_card">Cargando...</p>
+        </div>
+
+        <div class="card">
+          <h3><i data-lucide="qr-code"></i> QR</h3>
+          <img id="qr" width="200" style="display:none;" />
+        </div>
+
+      </div>
+    </div>
+
+    <!-- GRUPOS -->
+    <div id="grupos_seccion" class="seccion">
+      <h2><i data-lucide="users"></i> Grupos</h2>
+      <div id="grupos"></div>
+    </div>
+
+    <!-- MENSAJES -->
+    <div id="mensajes" class="seccion">
+      <h2><i data-lucide="settings"></i> Mensajes</h2>
+
+      <div class="msg-box">
+        <h3><i data-lucide="check-circle"></i> Reservados</h3>
+        <div id="reservado_list" class="msg-list"></div>
+        <button class="btn-add" onclick="agregarInput('reservado')">
+          <i data-lucide="plus"></i>
+        </button>
+      </div>
+
+      <div class="msg-box">
+        <h3><i data-lucide="x-circle"></i> Ocupados</h3>
+        <div id="ocupado_list" class="msg-list"></div>
+        <button class="btn-add" onclick="agregarInput('ocupado')">
+          <i data-lucide="plus"></i>
+        </button>
+      </div>
+
+      <div class="msg-box">
+        <h3><i data-lucide="alert-triangle"></i> Inválidos</h3>
+        <div id="invalido_list" class="msg-list"></div>
+        <button class="btn-add" onclick="agregarInput('invalido')">
+          <i data-lucide="plus"></i>
+        </button>
+      </div>
+
+      <button class="btn-save" onclick="guardarMensajes()">
+        <i data-lucide="save"></i>
+      </button>
+    </div>
+
+    <div id="logs" class="seccion logs"></div>
+
   </div>
-
-  <h3>🧠 Logs</h3>
-  <div id="logs" class="logs"></div>
-
 </div>
 
 <script>
@@ -47,146 +117,225 @@ if (!cliente_id) {
   window.location.href = "/"
 }
 
-document.getElementById("id").innerText = cliente_id
+function renderIcons() {
+  if (window.lucide) lucide.createIcons()
+}
 
 function logout() {
   localStorage.removeItem("cliente_id")
   window.location.href = "/"
 }
 
-// ================= ESTADO =================
-
-async function actualizar() {
-  try {
-    const res = await fetch("/estado/" + cliente_id)
-    const data = await res.json()
-
-    document.getElementById("estado").innerText = data.estado
-
-    if (data.qr) {
-      document.getElementById("qr").src = data.qr
-    }
-
-    document.getElementById("logs").innerText = data.logs.join("\n")
-
-  } catch (err) {
-    console.error(err)
-  }
+function mostrar(id) {
+  document.querySelectorAll(".seccion").forEach(s => s.style.display = "none")
+  document.getElementById(id).style.display = "block"
 }
 
-// ================= GRUPOS =================
+mostrar("dashboard")
+
+async function actualizar() {
+  const res = await fetch("/estado/" + cliente_id)
+  const data = await res.json()
+
+  estado_top.innerText = data.estado
+  estado_card.innerText = data.estado
+
+  if (data.qr) {
+    qr.style.display = "block"
+    qr.src = data.qr
+  } else {
+    qr.style.display = "none"
+  }
+
+  logs.innerText = (data.logs || []).join("\n")
+}
 
 async function cargarGrupos() {
   const res = await fetch("/grupos/" + cliente_id)
   const data = await res.json()
 
-  const contenedor = document.getElementById("grupos")
-  contenedor.innerHTML = ""
+  grupos.innerHTML = ""
 
   data.forEach(g => {
     const div = document.createElement("div")
-    div.className = "card"
+    div.className = "grupo-card"
 
-    // 🔥 IMPORTANTE: cambia localhost por tu IP
-    const linkTabla = `http://209.38.77.179:3000/tabla.html?g=${g.id}`
+    const link = `${location.origin}/tabla.html?g=${g.id}`
 
     div.innerHTML = `
-      <h3>📌 ${g.nombre || "Sin nombre"}</h3>
-      <p>🆔 ${g.id}</p>
+      <div class="grupo-header">
+        <div>
+          <div class="grupo-nombre">
+            <i data-lucide="pin"></i> ${g.nombre || "Sin nombre"}
+          </div>
+          <div class="grupo-id">
+            <i data-lucide="hash"></i> ${g.id}
+          </div>
+        </div>
 
-      <p class="estado ${g.permitido ? 'activo' : 'bloqueado'}">
-        ${g.permitido ? '✅ Activo' : '🔒 Bloqueado'}
-      </p>
+        <div class="badge ${g.permitido ? 'badge-activo' : 'badge-bloqueado'}">
+          <i data-lucide="${g.permitido ? 'check-circle' : 'lock'}"></i>
+          ${g.permitido ? 'Activo' : 'Bloqueado'}
+        </div>
+      </div>
 
       ${
         g.permitido
-          ? `
-            <div style="margin-top:10px;">
-              <p>📊 Tabla:</p>
+        ? `
+        <div class="grupo-link">
+          <i data-lucide="link"></i> ${link}
+        </div>
 
-              <input value="${linkTabla}" readonly style="width:100%; padding:5px;" />
+        <div class="grupo-actions">
+          <button onclick="copiar('${link}')">
+            <i data-lucide="copy"></i> Copiar
+          </button>
 
-              <div style="margin-top:5px;">
-                <button onclick="copiar('${linkTabla}')">📋 Copiar</button>
-                <button onclick="window.open('${linkTabla}')">🔗 Abrir</button>
-              </div>
-            </div>
-          `
-          : `
-            <button onclick="activar('${g.id}')">💰 Activar</button>
-          `
+          <button class="btn-sec" onclick="window.open('${link}')">
+            <i data-lucide="external-link"></i> Abrir
+          </button>
+        </div>`
+        : `
+        <div class="grupo-actions">
+          <button onclick="activar('${g.id}')">
+            <i data-lucide="dollar-sign"></i> Activar
+          </button>
+        </div>`
       }
     `
 
-    contenedor.appendChild(div)
+    grupos.appendChild(div)
   })
+
+  renderIcons()
 }
 
 // ================= MENSAJES =================
 
-// 🔥 CARGAR MENSAJES GUARDADOS
-async function cargarMensajes() {
-  const res = await fetch("/grupos/" + cliente_id) // usamos esto como base
+function crearInput(tipo, valor = "") {
+  const cont = document.createElement("div")
+  cont.className = "msg-item"
 
-  // ⚠️ mejor luego hacer endpoint /usuario
-  const db = await fetch("/db.json").then(r => r.json()).catch(() => null)
+  const input = document.createElement("input")
+  input.value = valor
+  input.placeholder = "Escribe el mensaje..."
+  input.classList.add(tipo)
 
-  if (!db) return
+  const btn = document.createElement("button")
+  btn.className = "btn-delete"
+  btn.innerHTML = "✕"
+  btn.onclick = () => cont.remove()
 
-  const usuario = db.usuarios[cliente_id]
-  if (!usuario || !usuario.mensajes) return
+  cont.appendChild(input)
+  cont.appendChild(btn)
 
-  document.getElementById("msg_reservado").value = usuario.mensajes.reservado || ""
-  document.getElementById("msg_ocupado").value = usuario.mensajes.ocupado || ""
-  document.getElementById("msg_invalido").value = usuario.mensajes.invalido || ""
+  return cont
 }
 
-// 🔥 GUARDAR MENSAJES
-async function guardarMensajes() {
+function agregarInput(tipo, valor = "") {
+  const contenedor = document.getElementById(tipo + "_list")
+  contenedor.appendChild(crearInput(tipo, valor))
+}
 
-  const mensajes = {
-    reservado: document.getElementById("msg_reservado").value,
-    ocupado: document.getElementById("msg_ocupado").value,
-    invalido: document.getElementById("msg_invalido").value
+async function cargarMensajes() {
+  try {
+    const res = await fetch("/mensajes/" + cliente_id)
+    const data = await res.json()
+
+    if (!Array.isArray(data)) return
+
+    const tipos = ["reservado", "ocupado", "invalido"]
+
+    // limpiar listas
+    tipos.forEach(tipo => {
+      document.getElementById(tipo + "_list").innerHTML = ""
+    })
+
+    // cargar datos
+    data.forEach(m => {
+      agregarInput(m.tipo, m.contenido)
+    })
+
+  } catch (err) {
+    console.error("❌ Error mensajes:", err)
   }
+}
 
-  await fetch("/guardar-mensajes", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      cliente_id,
-      mensajes
+async function guardarMensajes() {
+  const tipos = ["reservado", "ocupado", "invalido"]
+  const mensajes = {}
+
+  tipos.forEach(tipo => {
+    mensajes[tipo] = []
+
+    const inputs = document.querySelectorAll("." + tipo)
+
+    inputs.forEach(input => {
+      if (input.value.trim()) {
+        mensajes[tipo].push(input.value.trim())
+      }
     })
   })
 
-  alert("Mensajes guardados ✅")
+  try {
+    const res = await fetch("/guardar-mensajes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        cliente_id,
+        mensajes
+      })
+    })
+
+    const r = await res.json()
+
+    if (r.error) {
+      alert(r.error)
+      return
+    }
+
+    alert("Guardado ✅")
+    cargarMensajes()
+
+  } catch (err) {
+    console.error("❌ Error guardar:", err)
+  }
 }
+
 
 // ================= ACCIONES =================
 
-async function activar(grupo_id) {
-  await fetch("/activar/" + grupo_id)
-  alert("Grupo activado ✅")
-  cargarGrupos()
+async function activar(id) {
+  try {
+    await fetch("/activar/" + id)
+    alert("Grupo activado ✅")
+    cargarGrupos()
+  } catch (err) {
+    console.error("❌ Error activar:", err)
+  }
 }
 
 function copiar(texto) {
   navigator.clipboard.writeText(texto)
-  alert("Link copiado ✅")
+  alert("Copiado ✅")
 }
+
 
 // ================= INIT =================
 
-actualizar()
-cargarGrupos()
-cargarMensajes()
+async function init() {
+  await actualizar()
+  await cargarGrupos()
+  await cargarMensajes()
 
-setInterval(() => {
-  actualizar()
-  cargarGrupos()
-}, 2000)
+  renderIcons()
+}
+
+init()
+
+setInterval(actualizar, 2000)
 </script>
 
 </body>

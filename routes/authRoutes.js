@@ -1,32 +1,42 @@
 import express from "express"
-import { registrar, login } from "../services/authService.js"
+import { registrar, login } from "../bot/services/authService.js"
 
 const router = express.Router()
 
 // 🆕 REGISTRO
-router.post("/register", (req, res) => {
-  const { email, password } = req.body
+router.post("/register", async (req, res) => {
+  try {
+    const { email, password } = req.body
 
-  const result = registrar(email, password)
+    const result = await registrar(email, password)
 
-  if (result.error) {
-    return res.status(400).json(result)
+    if (result.error) {
+      return res.status(400).json(result)
+    }
+
+    res.json(result)
+
+  } catch (err) {
+    res.status(500).json({ error: "Error interno" })
   }
-
-  res.json(result)
 })
 
 // 🔑 LOGIN
-router.post("/login", (req, res) => {
-  const { email, password } = req.body
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body
 
-  const usuario = login(email, password)
+    const usuario = await login(email, password)
 
-  if (!usuario) {
-    return res.status(401).json({ error: "Credenciales incorrectas" })
+    if (!usuario) {
+      return res.status(401).json({ error: "Credenciales incorrectas" })
+    }
+
+    res.json(usuario)
+
+  } catch (err) {
+    res.status(500).json({ error: "Error interno" })
   }
-
-  res.json(usuario)
 })
 
 export default router
